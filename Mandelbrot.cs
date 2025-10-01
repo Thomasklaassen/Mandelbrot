@@ -40,33 +40,43 @@ Panel controlPanel = new Panel();
 controlPanel.Padding = new Padding(10);
 
 //All labels, textboxes and buttons init
+//X text and box
 Label xtekst = new Label { Text = "Midden x:", AutoSize = true, Location = new Point(10, 10)};
 TextBox invoerx = new TextBox { Location = new Point(100, 10)};
 
-
+//Y text and box
 Label ytekst = new Label { Text = "Midden y:", AutoSize = true, Location = new Point(10, 40) };
 TextBox invoery = new TextBox {Location = new Point(100, 40) };
 
+//Scale text and box
 Label schaaltekst = new Label { Text = "Schaal:", AutoSize = true, Location = new Point(10, 70)};
 TextBox schaalinvoer = new TextBox { Location = new Point(100, 70)};
 
+//Iteration text and box
 Label MaxIterationtekst = new Label { Text = "Max herhaling", AutoSize = true, Location = new Point(10, 100)};
 TextBox MaxIterationInvoer = new TextBox { Location = new Point(100, 100)};
 
+//Errormsg is asserted and given a new value in GoKnop_Click()
 Label Errormsg = new Label { Text = "", ForeColor = Color.Red, AutoSize = true, Location = new Point(0, 150) };
 
+//Gobutton
 Button goKnop = new Button { Text = "Go!", Location = new Point(120, 150)};
 scherm.AcceptButton = goKnop; // use enter to click go button.
 
-
+//dropdown menu for selecting standard mandelbrot
+ComboBox figuurMenu = new ComboBox { Name = "Standaardfiguren", Location = new Point(200, 50), Size = new Size(150, 50), DropDownStyle = ComboBoxStyle.DropDownList };
+figuurMenu.Items.AddRange(new object[] { "Zeepaardvallei", "Web" });
 
 //dropdown menu for selecting colour scheme.
-ComboBox kleurMenu = new ComboBox { Name = "Kleurenschema:", Location = new Point(200, 10), Size = new System.Drawing.Size(150, 50), DropDownStyle = ComboBoxStyle.DropDownList};
+ComboBox kleurMenu = new ComboBox { Name = "Kleurenschema:", Location = new Point(200, 10), Size = new Size(150, 50), DropDownStyle = ComboBoxStyle.DropDownList};
 kleurMenu.Items.AddRange( new object[] { "Zwart-wit", "Blauw", "Regenboog" });
 kleurMenu.SelectedItem = "Zwart-wit";
 
+//Dropdown menu for standard mandelbrot figures
+
+
 //Create control list and add all controls to the canvas. 
-Control[] allControls = new Control[] { xtekst, invoerx, ytekst, invoery, schaaltekst, schaalinvoer, MaxIterationtekst, MaxIterationInvoer, goKnop, Errormsg, kleurMenu };
+Control[] allControls = new Control[] { xtekst, invoerx, ytekst, invoery, schaaltekst, schaalinvoer, MaxIterationtekst, MaxIterationInvoer, goKnop, Errormsg, kleurMenu, figuurMenu };
 controlPanel.Controls.AddRange(allControls);
 scherm.Controls.Add(canvas);
 scherm.Controls.Add(controlPanel);
@@ -100,6 +110,26 @@ int BerekenMandelgetal(double x, double y, int maxIteraties)
     return iteraties;
 }
 
+
+Color HSV(double hue)
+{
+    int h = (int)(hue / 60) % 6;
+    double f = hue / 60 - Math.Floor(hue / 60);
+    int v = 255;
+    int t = (int)(255 * f);
+    int q = 255 - t;
+
+    return h switch
+    {
+        0 => Color.FromArgb(255, v, t, 0),
+        1 => Color.FromArgb(255, q, v, 0),
+        2 => Color.FromArgb(255, 0, v, t),
+        3 => Color.FromArgb(255, 0, q, v),
+        4 => Color.FromArgb(255, t, 0, v),
+        _ => Color.FromArgb(255, v, 0, q),
+    };
+}
+
 Color BepaalKleur(int mandelgetal)
 {
     if(kleurMenu.SelectedIndex == 2) // regenboog
@@ -108,22 +138,8 @@ Color BepaalKleur(int mandelgetal)
         {
             return Color.Black;
         }
-        float b = mandelgetal % 10;
-        switch (b)
-        {
-            case 0: return Color.FromArgb(255, 0, 0);
-            case 1: return Color.FromArgb(204, 102, 0);
-            case 2: return Color.FromArgb(153, 204, 0);
-            case 3: return Color.FromArgb(51, 255, 0);
-            case 4: return Color.FromArgb(0, 255, 102);
-            case 5: return Color.FromArgb(0, 255, 204);
-            case 6: return Color.FromArgb(0, 204, 255);
-            case 7: return Color.FromArgb(0, 102, 255);
-            case 8: return Color.FromArgb(51, 0, 255);
-            case 9: return Color.FromArgb(102, 0, 255);
-            default: return Color.White;
-        }
-
+        double hue = 360f * mandelgetal / maxIteraties;
+        return HSV(hue);
     }
     else if(kleurMenu.SelectedIndex == 1) // blauw
     { 
@@ -131,8 +147,10 @@ Color BepaalKleur(int mandelgetal)
         {
             return Color.Black;
         }
-        int value = (255 * mandelgetal / maxIteraties);
-        int b = Math.Max(value, 30);
+        double value = (double)mandelgetal / maxIteraties;
+
+        int b = (int)(255 * Math.Sqrt(value));
+        b = Math.Clamp(b, 30, 255);
         return Color.FromArgb(0, 0, b);
     }
     else if (kleurMenu.SelectedIndex == 0)  // zwart wit. 
@@ -185,6 +203,25 @@ void TekenMandelbrot(double mx, double my, double s, int maxIter)
 }
 void GoKnop_Click(object sender, EventArgs e)
 {
+    if(figuurMenu.SelectedItem == "Zeepaardvallei")
+    {
+        double middenXSV = -0.7962441;
+        double middenYSV = -0.245452;
+        double schaalSV = 0.0007296;
+        int maxIteratiesSV = 200;
+        TekenMandelbrot(middenXSV, middenYSV, schaalSV, maxIteratiesSV);
+        return;
+    }
+    if(figuurMenu.SelectedItem == "Web")
+    {
+        double middenXW = 0.013516845703125013;
+        double middenYW = -0.6556672668457033;
+        double schaalW = 9.765625E-06;
+        int maxIteratiesW = 1000;
+        TekenMandelbrot(middenXW, middenYW , schaalW, maxIteratiesW);
+        return;
+
+    }
     List<String> InvoerStrings = new List<String>() { invoerx.Text, invoery.Text, schaalinvoer.Text, MaxIterationInvoer.Text };
     foreach(string s in InvoerStrings)
     {
@@ -201,6 +238,15 @@ void GoKnop_Click(object sender, EventArgs e)
     // lees de waarden uit de tekstvakken en update de variabelen
     try
     {
+        List<string> invoer = new List<string> { invoerx.Text, invoery.Text, schaalinvoer.Text, MaxIterationInvoer.Text };
+        foreach (string s in invoer)
+        {
+            if (s.Contains("."))
+            {
+                Errormsg.Text = "Vul alleen cijfers \n of comma's in!";
+                return;
+            }
+        }
         middenX = double.Parse(invoerx.Text);
         middenY = double.Parse(invoery.Text);
         schaal = double.Parse(schaalinvoer.Text);
