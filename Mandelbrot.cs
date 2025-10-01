@@ -1,301 +1,298 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Eventing.Reader;
 using System.Drawing;
-using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Windows.Forms;
 
-
-
-//Form variable init
-double middenX = -0.5;
-double middenY = 0;
-double schaal = 0.01;
-int maxIteraties = 100;
-const int canvasGrootte = 500;
-
-
-//form init
-Form scherm = new Form();
-scherm.Text = "Mandelbrot";
-scherm.ClientSize = new Size(500, 700);
-scherm.KeyPreview = true;
-
-//Bitmaps and picturebox
-Bitmap plaatje = new Bitmap(canvasGrootte, canvasGrootte);
-PictureBox canvas = new PictureBox();
-canvas.Image = plaatje;
-canvas.SizeMode = PictureBoxSizeMode.Normal; 
-canvas.Dock = DockStyle.Top;  
-canvas.Height = canvasGrootte;
-using (Graphics gr = Graphics.FromImage(plaatje))
+public class MandelBrotViewer
 {
-    gr.Clear(Color.Blue);
-}
-
-
-
-// Control panel
-Panel controlPanel = new Panel();
-controlPanel.Padding = new Padding(10);
-
-//All labels, textboxes and buttons init
-//X text and box
-Label xtekst = new Label { Text = "Midden x:", AutoSize = true, Location = new Point(10, 10)};
-TextBox invoerx = new TextBox { Location = new Point(100, 10)};
-
-//Y text and box
-Label ytekst = new Label { Text = "Midden y:", AutoSize = true, Location = new Point(10, 40) };
-TextBox invoery = new TextBox {Location = new Point(100, 40) };
-
-//Scale text and box
-Label schaaltekst = new Label { Text = "Schaal:", AutoSize = true, Location = new Point(10, 70)};
-TextBox schaalinvoer = new TextBox { Location = new Point(100, 70)};
-
-//Iteration text and box
-Label MaxIterationtekst = new Label { Text = "Max herhaling", AutoSize = true, Location = new Point(10, 100)};
-TextBox MaxIterationInvoer = new TextBox { Location = new Point(100, 100)};
-
-//Errormsg is asserted and given a new value in GoKnop_Click()
-Label Errormsg = new Label { Text = "", ForeColor = Color.Red, AutoSize = true, Location = new Point(0, 150) };
-
-//Gobutton
-Button goKnop = new Button { Text = "Go!", Location = new Point(120, 150)};
-scherm.AcceptButton = goKnop; // use enter to click go button.
-
-//dropdown menu for selecting standard mandelbrot
-ComboBox figuurMenu = new ComboBox { Name = "Standaardfiguren", Location = new Point(200, 50), Size = new Size(150, 50), DropDownStyle = ComboBoxStyle.DropDownList };
-figuurMenu.Items.AddRange(new object[] { "Zeepaardvallei", "Web" });
-
-//dropdown menu for selecting colour scheme.
-ComboBox kleurMenu = new ComboBox { Name = "Kleurenschema:", Location = new Point(200, 10), Size = new Size(150, 50), DropDownStyle = ComboBoxStyle.DropDownList};
-kleurMenu.Items.AddRange( new object[] { "Zwart-wit", "Blauw", "Regenboog" });
-kleurMenu.SelectedItem = "Zwart-wit";
-
-//Dropdown menu for standard mandelbrot figures
-
-
-//Create control list and add all controls to the canvas. 
-Control[] allControls = new Control[] { xtekst, invoerx, ytekst, invoery, schaaltekst, schaalinvoer, MaxIterationtekst, MaxIterationInvoer, goKnop, Errormsg, kleurMenu, figuurMenu };
-controlPanel.Controls.AddRange(allControls);
-scherm.Controls.Add(canvas);
-scherm.Controls.Add(controlPanel);
-
-controlPanel.Height = 250;
-controlPanel.Width = 500;
-
-controlPanel.Top = canvas.Height;
-
-int BerekenMandelgetal(double x, double y, int maxIteraties)
-{
-    double a = 0.0;
-    double b = 0.0;
-    int iteraties = 0;
-
-
-    while (a * a + b * b <= 4 && iteraties < maxIteraties)
+    public class Form1 : Form
     {
-        double tempA = a * a - b * b + x;
-        b = 2 * a * b + y;
-        a = tempA;
-        iteraties++;
-    }
+        // Mandelbrot instellingen
+        double middenX = -0.5;
+        double middenY = 0;
+        double schaal = 0.01;
+        int maxIteraties = 100;
+        const int canvasGrootte = 500;
+
+        Bitmap plaatje;
+        PictureBox canvas;
+        TextBox invoerx, invoery, schaalinvoer, MaxIterationInvoer;
+        Label Errormsg;
+        ComboBox kleurMenu, figuurMenu;
 
 
-    if (iteraties == maxIteraties)
-    {
-        return -1; // dit is zegmaar om oneindig te representeren, omdat als die -1 returned dan stopt die met runnnen, want hij kan niet oneindig itereren.(dus als die max iteraties berijkt dan stopt DIE)
-    }
-
-    return iteraties;
-}
-
-
-Color HSV(double hue)
-{
-    int h = (int)(hue / 60) % 6;
-    double f = hue / 60 - Math.Floor(hue / 60);
-    int v = 255;
-    int t = (int)(255 * f);
-    int q = 255 - t;
-
-    return h switch
-    {
-        0 => Color.FromArgb(255, v, t, 0),
-        1 => Color.FromArgb(255, q, v, 0),
-        2 => Color.FromArgb(255, 0, v, t),
-        3 => Color.FromArgb(255, 0, q, v),
-        4 => Color.FromArgb(255, t, 0, v),
-        _ => Color.FromArgb(255, v, 0, q),
-    };
-}
-
-Color BepaalKleur(int mandelgetal)
-{
-    if(kleurMenu.SelectedIndex == 2) // regenboog
-    {
-        if(mandelgetal == -1)
+        Dictionary<string, (double x, double y, double schaal, int iter)> standaardFiguur = new()
         {
-            return Color.Black;
+            { "Zeepaardvallei", (-0.7962441, -0.245452, 0.0007296, 200) },
+            { "Web", (0.013516845703125013, -0.6556672668457033, 9.765625E-06, 1000) },
+            { "Spiraal", (-0.761574, -0.0847596, 0.0005, 300) },
+            { "Vlinder", (-1.747, 0.00005, 0.00001, 500) },
+            { "Dubbelkern", (-0.1015, 0.633, 0.00005, 400) }
+        };
+
+        public Form1()
+        {
+           
+            UI();
         }
-        double hue = 360f * mandelgetal / maxIteraties;
-        return HSV(hue);
-    }
-    else if(kleurMenu.SelectedIndex == 1) // blauw
-    { 
-        if (mandelgetal == -1)
-        {
-            return Color.Black;
-        }
-        double value = (double)mandelgetal / maxIteraties;
 
-        int b = (int)(255 * Math.Sqrt(value));
-        b = Math.Clamp(b, 30, 255);
-        return Color.FromArgb(0, 0, b);
-    }
-    else if (kleurMenu.SelectedIndex == 0)  // zwart wit. 
-    {
-        if (mandelgetal == -1)
+        private void UI()
         {
-            return Color.Black;
-        }
-        else if (mandelgetal % 2 == 0)
-        {
-            return Color.Black;
-        }
-        else
-        {
-            return Color.White;
-        }
-    }
-    else
-    {
-        Errormsg.Text = "Selecteer een kleurschema.";
-        return Color.White;
-    }
-  
+            this.Text = "Mandelbrot Viewer";
+            this.ClientSize = new Size(500, 700);
 
-}
-
-void TekenMandelbrot(double mx, double my, double s, int maxIter)
-{
-    using (Graphics gr = Graphics.FromImage(plaatje))
-    {
-        gr.Clear(Color.Blue); // maakt de achtergrond blauw
-
-        for (int p_x = 0; p_x < canvasGrootte; p_x++)
-        {
-            for (int p_y = 0; p_y < canvasGrootte; p_y++)
+            plaatje = new Bitmap(canvasGrootte, canvasGrootte);
+            canvas = new PictureBox
             {
-                
-                double x = mx + (p_x - canvasGrootte / 2.0) * s;
-                double y = my + (p_y - canvasGrootte / 2.0) * s;
+                Image = plaatje,
+                SizeMode = PictureBoxSizeMode.Normal,
+                Dock = DockStyle.Top,
+                Height = canvasGrootte
+            };
+            this.Controls.Add(canvas);
+            canvas.MouseDown += canvas_MouseDown;
 
-                // berekent het mandelgetal en bepaal de kleur
-                int mandelgetal = BerekenMandelgetal(x, y, maxIter);
-                Color kleur = BepaalKleur(mandelgetal);
-
-                plaatje.SetPixel(p_x, p_y, kleur);
-            }
-        }
-    }
-    canvas.Invalidate();
-}
-void GoKnop_Click(object sender, EventArgs e)
-{
-    if(figuurMenu.SelectedItem == "Zeepaardvallei")
-    {
-        double middenXSV = -0.7962441;
-        double middenYSV = -0.245452;
-        double schaalSV = 0.0007296;
-        int maxIteratiesSV = 200;
-        TekenMandelbrot(middenXSV, middenYSV, schaalSV, maxIteratiesSV);
-        return;
-    }
-    if(figuurMenu.SelectedItem == "Web")
-    {
-        double middenXW = 0.013516845703125013;
-        double middenYW = -0.6556672668457033;
-        double schaalW = 9.765625E-06;
-        int maxIteratiesW = 1000;
-        TekenMandelbrot(middenXW, middenYW , schaalW, maxIteratiesW);
-        return;
-
-    }
-    List<String> InvoerStrings = new List<String>() { invoerx.Text, invoery.Text, schaalinvoer.Text, MaxIterationInvoer.Text };
-    foreach(string s in InvoerStrings)
-    {
-        if (string.IsNullOrEmpty(s))
-        {
-            Errormsg.Text = "Vul alle velden in!";
-            return;
-        }
-        else
-        {
-            Errormsg.Text = "";
-        }
-    }
-    // lees de waarden uit de tekstvakken en update de variabelen
-    try
-    {
-        List<string> invoer = new List<string> { invoerx.Text, invoery.Text, schaalinvoer.Text, MaxIterationInvoer.Text };
-        foreach (string s in invoer)
-        {
-            if (s.Contains("."))
+            Panel controlPanel = new Panel
             {
-                Errormsg.Text = "Vul alleen cijfers \n of comma's in!";
+                Padding = new Padding(10),
+                Height = 350,
+                Width = 500,
+                Top = canvas.Height
+            };
+
+            // labels enz
+            int labelX = 20, inputX = 120, rowHeight = 25;
+            int yOffset = 10;
+
+            Label xtekst = new Label { Text = "Midden x:", AutoSize = true, Location = new Point(labelX, yOffset) };
+            invoerx = new TextBox { Location = new Point(inputX, yOffset), Width = 100 };
+
+            yOffset += rowHeight;
+            Label ytekst = new Label { Text = "Midden y:", AutoSize = true, Location = new Point(labelX, yOffset) };
+            invoery = new TextBox { Location = new Point(inputX, yOffset), Width = 100 };
+
+            yOffset += rowHeight;
+            Label schaaltekst = new Label { Text = "Schaal:", AutoSize = true, Location = new Point(labelX, yOffset) };
+            schaalinvoer = new TextBox { Location = new Point(inputX, yOffset), Width = 100 };
+
+            yOffset += rowHeight;
+            Label MaxIterationtekst = new Label { Text = "Max herhaling:", AutoSize = true, Location = new Point(labelX, yOffset) };
+            MaxIterationInvoer = new TextBox { Location = new Point(inputX, yOffset), Width = 100 };
+
+            // Kleurenschema dropdown
+            yOffset += rowHeight + 10;
+            Label kleurLabel = new Label { Text = "Kleurenschema:", AutoSize = true, Location = new Point(labelX, yOffset) };
+            kleurMenu = new ComboBox
+            {
+                Location = new Point(inputX, yOffset),
+                Size = new Size(150, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            kleurMenu.Items.AddRange(new object[] {
+            "Zwart-wit", "Blauw", "Vuur", "Groen", "Paars",
+            "Pastel Regenboog", "Koel Spectrum", "Vulkanisch"
+            });
+            kleurMenu.SelectedItem = "Zwart-wit";
+
+            // figuur dropdown
+            yOffset += rowHeight;
+            Label figuurLabel = new Label { Text = "Standaardfiguur:", AutoSize = true, Location = new Point(labelX, yOffset) };
+            figuurMenu = new ComboBox
+            {
+                Location = new Point(inputX, yOffset),
+                Size = new Size(150, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            figuurMenu.Items.AddRange(standaardFiguur.Keys.ToArray());
+            figuurMenu.SelectedItem = "Zeepaardvallei";
+
+            // Go-knop en errors
+            yOffset += rowHeight ;
+            Button goKnop = new Button
+            {
+                Text = "Go!",
+                Location = new Point(labelX, yOffset),
+                Size = new Size(80, 30)
+            };
+
+            goKnop.Click += GoKnop_Click;
+            this.AcceptButton = goKnop;
+
+            yOffset += rowHeight;
+            Errormsg = new Label { Text = "", ForeColor = Color.Red, AutoSize = true, Location = new Point(labelX, yOffset) };
+
+            //  alles toevoegen aan het panel
+            controlPanel.Controls.AddRange(new Control[] {
+            xtekst, invoerx, ytekst, invoery, schaaltekst, schaalinvoer,
+            MaxIterationtekst, MaxIterationInvoer,
+            kleurLabel, kleurMenu,
+            figuurLabel, figuurMenu,
+            goKnop, Errormsg
+            });
+
+            this.Controls.Add(controlPanel);
+
+            // teken het figuur bij opstart
+            TekenMandelbrot(middenX, middenY, schaal, maxIteraties);
+        }
+
+
+        private void GoKnop_Click(object sender, EventArgs e)
+        {
+            if (figuurMenu.SelectedItem != null && standaardFiguur.ContainsKey(figuurMenu.SelectedItem.ToString()))
+            {
+                var figuur = standaardFiguur[figuurMenu.SelectedItem.ToString()];
+                TekenMandelbrot(figuur.x, figuur.y, figuur.schaal, figuur.iter);
                 return;
             }
+
+            if (string.IsNullOrWhiteSpace(invoerx.Text) || string.IsNullOrWhiteSpace(invoery.Text) ||
+                string.IsNullOrWhiteSpace(schaalinvoer.Text) || string.IsNullOrWhiteSpace(MaxIterationInvoer.Text))
+            {
+                Errormsg.Text = "Vul alle velden in!";
+                return;
+            }
+
+            try
+            {
+                middenX = Convert.ToDouble(invoerx.Text.Replace(".", ","));
+                middenY = Convert.ToDouble(invoery.Text.Replace(".", ","));
+                schaal = Convert.ToDouble(schaalinvoer.Text.Replace(".", ","));
+                maxIteraties = Convert.ToInt32(MaxIterationInvoer.Text);
+            }
+            catch
+            {
+                Errormsg.Text = "Vul geldige getallen in!";
+                return;
+            }
+
+            TekenMandelbrot(middenX, middenY, schaal, maxIteraties);
+
         }
-        middenX = double.Parse(invoerx.Text);
-        middenY = double.Parse(invoery.Text);
-        schaal = double.Parse(schaalinvoer.Text);
-        maxIteraties = int.Parse(MaxIterationInvoer.Text);
+
+        private void canvas_MouseDown(object sender, MouseEventArgs e)
+        {
+            middenX += (e.X - canvas.Width / 2.0) * schaal;
+            middenY += (e.Y - canvas.Height / 2.0) * schaal;
+
+            if (e.Button == MouseButtons.Left)
+                schaal /= 2.0;
+            else if (e.Button == MouseButtons.Right)
+                schaal *= 2.0;
+
+            invoerx.Text = middenX.ToString();
+            invoery.Text = middenY.ToString();
+            schaalinvoer.Text = schaal.ToString();
+
+            TekenMandelbrot(middenX, middenY, schaal, maxIteraties);
+        }
+
+        private int BerekenMandelgetal(double x, double y, int maxIteraties)
+        {
+            double a = 0.0, b = 0.0;
+            int iteraties = 0;
+            while (a * a + b * b <= 4 && iteraties < maxIteraties)
+            {
+                double tempA = a * a - b * b + x;
+                b = 2 * a * b + y;
+                a = tempA;
+                iteraties++;
+            }
+            return iteraties == maxIteraties ? -1 : iteraties;
+        }
+
+        private Color BepaalKleur(int mandelgetal)
+        {
+            if (mandelgetal == -1) return Color.Black;
+            double ratio = (double)mandelgetal / maxIteraties;
+
+            switch (kleurMenu.SelectedItem.ToString())
+            {
+                case "Blauw": return Color.FromArgb(0, 0, Math.Clamp((int)(255 * Math.Sqrt(ratio)), 30, 255));
+                case "Zwart-wit": return mandelgetal % 2 == 0 ? Color.Black : Color.White;
+                case "Vuur":
+                    int r = Math.Clamp(mandelgetal * 5, 0, 255);
+                    int g = Math.Clamp(mandelgetal * 2, 0, 255);
+                    return Color.FromArgb(r, g, 0);
+                case "Groen":
+                    int groen = Math.Clamp((int)(255 * Math.Sqrt(ratio)), 0, 255);
+                    return Color.FromArgb(0, groen, 0);
+                case "Paars":
+                    int p = Math.Clamp((int)(255 * Math.Pow(ratio, 0.5)), 0, 255);
+                    return Color.FromArgb(p / 2, 0, p);
+                case "Pastel Regenboog":
+                    double hue1 = 360.0 * ratio;
+                    return HSV(hue1, 0.4, 1.0);
+                case "Koel Spectrum":
+                    double hue2 = 240.0 * ratio; // blueish tones
+                    double sat2 = 0.8;
+                    double val2 = 0.6 + 0.4 * ratio;
+                    return HSV(hue2, sat2, val2);
+                case "Vulkanisch":
+                    double hue3 = 30 + 30 * ratio; // orange-red
+                    double sat3 = 1.0;
+                    double val3 = 0.5 + 0.5 * ratio;
+                    return HSV(hue3, sat3, val3);
+
+                default: return Color.White;
+            }
+        }
+
+         Color HSV(double hue, double saturation, double value)
+        {
+            saturation = Math.Clamp(saturation, 0.0, 1.0);
+            value = Math.Clamp(value, 0.0, 1.0);
+            int hi = Convert.ToInt32(Math.Floor(hue / 60)) % 6;
+            double f = hue / 60 - Math.Floor(hue / 60);
+
+            value *= 255;
+            int v = Convert.ToInt32(value);
+            int p = Convert.ToInt32(value * (1 - saturation));
+            int q = Convert.ToInt32(value * (1 - f * saturation));
+            int t = Convert.ToInt32(value * (1 - (1 - f) * saturation));
+
+            return hi switch
+            {
+                0 => Color.FromArgb(v, t, p),
+                1 => Color.FromArgb(q, v, p),
+                2 => Color.FromArgb(p, v, t),
+                3 => Color.FromArgb(p, q, v),
+                4 => Color.FromArgb(t, p, v),
+                _ => Color.FromArgb(v, p, q),
+            };
+        }
+
+
+        private void TekenMandelbrot(double mx, double my, double s, int maxIter)
+        {
+            using Graphics gr = Graphics.FromImage(plaatje);
+            gr.Clear(Color.Blue);
+
+            for (int px = 0; px < canvasGrootte; px++)
+            {
+                for (int py = 0; py < canvasGrootte; py++)
+                {
+                    double x = mx + (px - canvasGrootte / 2.0) * s;
+                    double y = my + (py - canvasGrootte / 2.0) * s;
+                    int mandelgetal = BerekenMandelgetal(x, y, maxIter);
+                    plaatje.SetPixel(px, py, BepaalKleur(mandelgetal));
+                }
+            }
+
+            canvas.Invalidate();
+        }
     }
-    catch 
+    static class Program
     {
-        Errormsg.Text = "Vul alleen cijfers \n of comma's in!";
-        return;
+        [STAThread]
+        static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new Form1());
+        }
     }
 
-
-    TekenMandelbrot(middenX, middenY, schaal, maxIteraties);
 }
 
-
-
-//Event handlers
-void canvas_MouseDown(object sender, MouseEventArgs e)
-{
-    // bepaalt het nieuwe middelpunt van de muisklik
-    middenX += (e.X - canvas.Width / 2.0) * schaal;
-    middenY += (e.Y - canvas.Height / 2.0) * schaal;
-
-    // past de schaal aan op basis van de muisknop
-    if (e.Button == MouseButtons.Left)
-    {
-        schaal /= 2.0; // Inzoomen
-    }
-    else if (e.Button == MouseButtons.Right)
-    {
-        schaal *= 2.0; // Uitzoomen
-    }
-
-    // update de tekstvakken en teken opnieuw
-    invoerx.Text = middenX.ToString();
-    invoery.Text = middenY.ToString();
-    schaalinvoer.Text = schaal.ToString();
-
-    TekenMandelbrot(middenX, middenY, schaal, maxIteraties);
-}
-
-
-goKnop.Click += GoKnop_Click;
-canvas.MouseDown += canvas_MouseDown;
-
-
-
-
-
-
-Application.Run(scherm);
